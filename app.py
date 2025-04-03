@@ -41,6 +41,7 @@ def load_user(user_id):
 @login_required
 def index():
     tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.date).all()
+    flash('Welcome to your scheduling dashboard! Here you can manage your tasks.', 'info')
     return render_template('index.html', tasks=tasks)
 
 # Login route
@@ -52,7 +53,9 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password, password):
             login_user(user)
+            flash('Login successful! Navigate to the dashboard to manage tasks.', 'success')
             return redirect(url_for('index'))
+        flash('Invalid username or password. Please try again.', 'danger')
     return render_template('login.html')
 
 # Registration route
@@ -64,6 +67,7 @@ def register():
         new_user = User(username=username, password=password)
         db.session.add(new_user)
         db.session.commit()
+        flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -71,6 +75,7 @@ def register():
 @app.route('/logout')
 def logout():
     logout_user()
+    flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
 # Password reset request route
@@ -111,6 +116,7 @@ def add_task():
     new_task = Task(title=title, date=datetime.strptime(date, '%Y-%m-%dT%H:%M'), user_id=current_user.id)
     db.session.add(new_task)
     db.session.commit()
+    flash('Task added successfully!', 'success')
     return redirect(url_for('index'))
 
 # Route to delete a task
@@ -119,9 +125,11 @@ def add_task():
 def delete_task(id):
     task = Task.query.get_or_404(id)
     if task.user_id != current_user.id:
+        flash('Unauthorized action.', 'danger')
         return redirect(url_for('index'))
     db.session.delete(task)
     db.session.commit()
+    flash('Task deleted successfully.', 'success')
     return redirect(url_for('index'))
 
 # API Endpoint: Get all tasks for the logged-in user
