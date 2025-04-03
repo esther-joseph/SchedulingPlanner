@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from datetime import datetime
+import secrets
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schedule.db'
@@ -17,6 +18,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    reset_token = db.Column(db.String(100), unique=True, nullable=True)
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -60,6 +62,33 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        username = request.form['username']
+        user = User.query.filter_by(username=username).first()
+        if user:
+            user.reset_token = secrets.token_hex(16)
+            db.session.commit()
+            flash(f'Your reset token: {user.reset_token}', 'info')
+        else:
+            flash('User not found', 'danger')
+    return render_template('reset_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def update_password(token):
+    user = User.query.filter_by(reset_token=token).first()
+    if not user:
+        flash('Invalid or expired token', 'danger')
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        user.password = generate_password_hash(request.form['password'], method='pbkdf2:sha256')
+        user.reset_token = None
+        db.session.commit()
+        flash('Password updated successfully', 'success')
+        return redirect(url_for('login'))
+    return render_template('update_password.html')
 
 @app.route('/add', methods=['POST'])
 @login_required
